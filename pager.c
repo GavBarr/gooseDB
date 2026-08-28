@@ -1,4 +1,5 @@
 #include "pager.h"
+#include <complex.h>
 #include <fcntl.h>   // For flags like O_RDONLY, O_WRONLY, O_CREAT
 #include <unistd.h>  // For system calls like close(), read(), write()
 #include <sys/types.h>
@@ -34,11 +35,13 @@
 */
 HashTable* hash_table;
 
-
+static void move_lru_head(Pager* pager, int frame_index);
 static uint32_t lookup_has_entry(HashTable* hashtable, int key);
 static int insert_hash_entry(HashTable* hash_table, int key, int value);
 static int remove_hash_entry(HashTable* hash_table, int slot);
 static int header_check(Pager* pager, int fd);
+static int find_free_frame(Pager* pager);
+static int evict_page_frame(Pager* pager);
 
 Pager* pager_open(char* const file_dir){
 	Pager* pager = malloc(sizeof(Pager));
@@ -70,6 +73,7 @@ Pager* pager_open(char* const file_dir){
 	}
 
 	for (int p = 0; p < CACHE_SIZE; p++){
+		pager->frames[p].page_num = -1;
 		pager->frames[p].in_use = 0;
 		pager->frames[p].is_dirty = 0;
 	}
@@ -128,29 +132,183 @@ static int insert_hash_entry(HashTable* hash_table, int key, int value){
 }
 
 
+/**
+ * @brief Marking a page as dirty
+ *
+ * Marking the designated page as dirty, so we can later write the page during
+ * the pager_flush() function. 
+ *
+ * @param Pager* pager - the global pager.
+ * @param int page_num - page number that needs to be marked as dirty.
+ * @return void, nothing to return.
+ */
+void pager_mark_dirty(Pager* pager, int page_num){
+	if (page_num < 0) return;
+        int frame_index = lookup_has_entry(hash_table, page_num);
+
+        if (frame_index != -1){
+                pager->frames[frame_index].is_dirty = true;
+        }
+
+        //linear scan if not in hashtable
+        for(int i = 0; i < CACHE_SIZE; i++){
+                if (pager->frames[i].page_num == page_num){
+                        pager->frames[i].is_dirty = true;
+                }
+        }
+
+
+}
+
+void pager_flush(Pager* pager, int page_num){
+	if (page_num < 0) return;
+        int frame_index = lookup_has_entry(hash_table, page_num);
+
+        if (frame_index == -1){
+		//linear scan if not in hashtable
+	        for(int i = 0; i < CACHE_SIZE; i++){
+        	        if (pager->frames[i].page_num == page_num){
+                	        frame_index = i;
+				break;
+                	}
+        	}
+        }
+
+	pager->frames[frame_index].is_dirty=false;
+
+	int offset = page_num * pager->page_size;
+	ssize_t bytes_written = pwrite(pager->fd, pager->frames[frame_index].data, pager->page_size, offset);
+	if (bytes_written <= 0)
+	{	
+		perror("write");
+		printf("failed to flush page: %d", page_num);
+	}
+}
+
+
+void pager_close(Pager* pager){
+	close(pager->fd);
+	free(pager);
+
+}
+
 static uint32_t hash(int key, int table_size){
 
 	return key % table_size;
 }
 
+static int evict_page_frame(Pager* pager){
+	int frame_index = pager->lru_tail;
+	int i = 0;
+
+	while(1){
+		if (i > CACHE_SIZE)break;
+		
+		if (pager->frames[frame_index].pin_count == 0){
+		
+			return frame_index;
+		}
+		frame_index = pager->frames[frame_index].lru_prev;
+		i++;
+	}
+
+
+	return -1;
+}
+//HEAD
+// ↓
+//Frame 2 → Frame 0 → Frame 3
+//                       ↑
+//                      TAIL
+//Frame 2:
+//    prev = -1
+//    next = 0
+
+//Frame 0:
+//    prev = 2
+//    next = 3
+
+//Frame 3:
+//    prev = 0
+//    next = -1
+static void move_lru_head(Pager* pager, int frame_index){
+	pager->frames[frame_index].lru_prev = -1; //set prev -1, this is the new head
+	pager->frames[frame_index].lru_next = pager->lru_head;
+
+	// check for empty list
+	if (pager->lru_head != -1){
+		pager->frames[pager->lru_head].lru_prev = frame_index;
+
+	}else{
+		pager->lru_tail = frame_index;
+	}
+
+	pager->lru_head = frame_index;
+
+
+}
+
+
+int pager_allocate_page(Pager* pager){
+	
+	int last_page = pager->num_pages;
+		
+	ftruncate(pager->fd, (last_page + 1) * pager->page_size);
+
+	return last_page + 1;
+}
 
 void* pager_get_page(Pager* pager, int page_num){
 	if (page_num < 0) return NULL;
 	int frame_index = lookup_has_entry(hash_table, page_num);
 
 	if (frame_index != -1){
+		//set lru_prev and lru_next as necessary, lru_head included.
+		move_lru_head(pager, frame_index);
+
 		return pager->frames[frame_index].data;
 	}
 
 	//linear scan if not in hashtable
 	for(int i = 0; i < CACHE_SIZE; i++){
 		if (pager->frames[i].page_num == page_num){
+			move_lru_head(pager, frame_index);
 			return pager->frames[i].data;
 		}
 	}
+	
+	//find free frame
+	frame_index = find_free_frame(pager);
 
+	if (frame_index == -1){
+		printf("free frame not found!\n");
+		frame_index = evict_page_frame(pager);
+		if (frame_index == -1){
+			return NULL;
+		}
+	}
+
+	ssize_t data_read = pread(pager->fd, pager->frames[frame_index].data ,pager->page_size,page_num * pager->page_size);
+
+	if (data_read == -1){
+		printf("data read has 0 bytes!\nn");
+
+	}
+
+	insert_hash_entry(hash_table, frame_index, page_num);
+	move_lru_head(pager, frame_index);
+	
 	return NULL;
+}
 
+
+static int find_free_frame(Pager* pager){
+	for (int i = 0; i < CACHE_SIZE; i++){
+		if (pager->frames[i].page_num == -1){
+			return i;
+		}
+	}
+	return -1; //return -1 if none are free
 }
 
 static int header_check(Pager* pager, int fd){

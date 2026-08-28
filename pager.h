@@ -35,8 +35,8 @@ typedef struct{
 	bool	   in_use;
 	uint32_t pin_count;
         uint8_t  data[PAGE_SIZE]; //uint8_t because we want 1 byte per index
-	int lru_prev; //double linked list (inner)	
-	int lru_next; //double linked list (inner)	
+	int lru_prev; //frame_index - double linked list (inner)	
+	int lru_next; //frame_index - double linked list (inner)	
 } PageFrame;
 
 typedef struct{
@@ -47,12 +47,15 @@ typedef struct{
 	PageFrame frames[CACHE_SIZE];
 	HashTable frameHashTable[CACHE_SIZE];
 	int       lru_head;
-	int       lru_previous;
+	int       lru_tail;
 } Pager;
 
 
 Pager* pager_open(char* const file_dir);
 void* pager_get_page(Pager* pager, int page_num);
-
+void   pager_mark_dirty(Pager* pager, int page_num);
+void   pager_flush(Pager* pager, int page_num);     // write one page back to disk
+void   pager_close(Pager* pager);                   // flush all dirty pages, close fd
+int pager_allocate_page(Pager* pager);  // grow the file by one page, return its number
 
 #endif
