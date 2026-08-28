@@ -10,6 +10,14 @@
 #include <stdbool.h>
 
 typedef struct{
+	uint32_t  key; //page in our case
+	uint32_t  value; //pageframe index in our case
+	void* next;
+	void* prev;
+
+} HashTableEntry;
+
+typedef struct{
 	char      magic[8];
 	uint32_t  page_size;
 	uint32_t  root_page;
@@ -17,8 +25,8 @@ typedef struct{
 } FileHeader;
 
 typedef struct{
-	int key;
-	int frame_index;
+	HashTableEntry** buckets;
+	uint32_t size;
 } HashTable;
 
 typedef struct{
@@ -26,7 +34,7 @@ typedef struct{
 	bool     is_dirty;
 	bool	   in_use;
 	uint32_t pin_count;
-        uint8_t  data[PAGE_SIZE];
+        uint8_t  data[PAGE_SIZE]; //uint8_t because we want 1 byte per index
 	int lru_prev; //double linked list (inner)	
 	int lru_next; //double linked list (inner)	
 } PageFrame;
@@ -35,13 +43,16 @@ typedef struct{
 	int       fd;
 	int	  page_size;
 	int       num_pages;
+	uint32_t  root_page;
 	PageFrame frames[CACHE_SIZE];
+	HashTable frameHashTable[CACHE_SIZE];
 	int       lru_head;
 	int       lru_previous;
 } Pager;
 
 
 Pager* pager_open(char* const file_dir);
+void* pager_get_page(Pager* pager, int page_num);
 
 
 #endif
