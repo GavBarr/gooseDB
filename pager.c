@@ -7,32 +7,6 @@
 #include <string.h>
 #include <stdio.h>
 
-
-/*
-   typedef struct{
-          int key;
-          int frame_index;
-  } HashTable;
-                   
-  typedef struct{
-          int      page_num;
-          bool     is_dirty;
-          bool       in_use;
-          uint32_t pin_count;
-          uint8_t  data[PAGE_SIZE];
-          int lru_prev; //double linked list (inner)      
-          int lru_next; //double linked list (inner)      
-  } PageFrame;
-         
-  typedef struct{
-          int       fd;
-          int       page_size;
-          int       num_pages;
-          PageFrame frames[CACHE_SIZE];
-          int       lru_head;
-          int       lru_previous;
-  } Pager;
-*/
 HashTable* hash_table;
 
 static void move_lru_head(Pager* pager, int frame_index);
@@ -69,7 +43,8 @@ Pager* pager_open(char* const file_dir){
 		pager->num_pages = ((file_info.st_size + PAGE_SIZE - 1) / PAGE_SIZE); //we skip the header or first "page" of the num of pages
 		pager->page_size = PAGE_SIZE;
 		pager->lru_head = -1;
-		pager->lru_previous = -1;
+		pager->lru_tail = -1;
+
 	}
 
 	for (int p = 0; p < CACHE_SIZE; p++){
@@ -177,7 +152,11 @@ void pager_flush(Pager* pager, int page_num){
 	pager->frames[frame_index].is_dirty=false;
 
 	int offset = page_num * pager->page_size;
+
+	pager->frames[frame_index].pin_count++;
 	ssize_t bytes_written = pwrite(pager->fd, pager->frames[frame_index].data, pager->page_size, offset);
+	pager->frames[frame_index].pin_count--;
+
 	if (bytes_written <= 0)
 	{	
 		perror("write");
@@ -288,7 +267,9 @@ void* pager_get_page(Pager* pager, int page_num){
 		}
 	}
 
+	pager->frames[frame_index].pin_count++;
 	ssize_t data_read = pread(pager->fd, pager->frames[frame_index].data ,pager->page_size,page_num * pager->page_size);
+	pager->frames[frame_index].pin_count--;
 
 	if (data_read == -1){
 		printf("data read has 0 bytes!\nn");
