@@ -130,7 +130,6 @@ void pager_mark_dirty(Pager* pager, int page_num){
         for(int i = 0; i < CACHE_SIZE; i++){
                 if (pager->frames[i].page_num == page_num){
                         pager->frames[i].is_dirty = true;
-			printf("marked is_dirty!\n");
                 }
         }
 
@@ -152,12 +151,11 @@ void pager_flush(Pager* pager, int page_num){
         }
 
 	if (frame_index == -1){
-		printf("frame_index%d\n",frame_index);
+		printf("frame_index is -1!%d\n",frame_index);
 	}
 
 	off_t offset = (off_t)(page_num * pager->page_size);
 	
-	printf("frame_index%d\n",frame_index);
 	pager->frames[frame_index].pin_count++;
 	ssize_t bytes_written = pwrite(pager->fd, pager->frames[frame_index].data, pager->page_size, offset);
 	if (bytes_written <=0 ){
@@ -248,11 +246,12 @@ static void move_lru_head(Pager* pager, int frame_index){
 
 int pager_allocate_page(Pager* pager){
 	
-	int last_page = pager->num_pages; //-1 is so that we are zero based 
-		
-	ftruncate(pager->fd, (last_page + 1) * pager->page_size);
+	int new_page_num = pager->num_pages; //-1 is so that we are zero based 
+	pager->num_pages++;	
 
-	return last_page + 1;
+	ftruncate(pager->fd, (off_t)pager->num_pages * pager->page_size);
+
+	return new_page_num;
 }
 
 void* pager_get_page(Pager* pager, int page_num){
@@ -269,7 +268,7 @@ void* pager_get_page(Pager* pager, int page_num){
 	//linear scan if not in hashtable
 	for(int i = 0; i < CACHE_SIZE; i++){
 		if (pager->frames[i].page_num == page_num){
-			move_lru_head(pager, frame_index);
+			move_lru_head(pager, i); //move_lru_head(pager, frame_index)
 			return pager->frames[i].data;
 		}
 	}
@@ -294,8 +293,8 @@ void* pager_get_page(Pager* pager, int page_num){
 
 	}
 	
-	printf("page_num_hash->%d\n",page_num);
-	insert_hash_entry(hash_table, frame_index, page_num);
+	insert_hash_entry(hash_table, page_num, frame_index);
+	//insert_hash_entry(hash_table, frame_index, page_num);
 	move_lru_head(pager, frame_index);
 	pager->frames[frame_index].page_num = page_num;	
 	
