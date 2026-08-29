@@ -3,9 +3,14 @@
 #define COMMON_HEADER 6
 #define LEAF_HEADER 4
 #define PAGE_SIZE 4096
+#define LEAF 1
+#define INTERNAL 0
+#define INVALID_PAGE -1
 
+#include "pager.h"
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 
 typedef struct __attribute__((packed)){
 	uint8_t node_type;
@@ -20,10 +25,25 @@ typedef struct __attribute__((packed)){
 } LeafHeader;
 
 typedef struct __attribute__((packed)){
+	uint32_t num_keys;
+	uint32_t right_child_pointer;
+} InternalHeader;
+
+typedef struct __attribute__((packed)){
+        CommonHeader common_header;
+	union{
+		LeafHeader leaf_header;
+		InternalHeader internal_header;
+	};
+} BTreeNode;
+
+typedef struct __attribute__((packed)){
 	uint32_t id;
         char username[32];
 	char email[255];
 } Row;
+
+void btree_create(Pager* pager);
 
 #define ROW_SIZE (sizeof(Row))
 #define CELL_SIZE (sizeof(uint32_t)+ROW_SIZE)

@@ -1,9 +1,12 @@
 #include "pager.h"
+#include "b_tree.h"
 #include <string.h>
 
 int main(void){
 	printf("test");
-	Pager* pager = pager_open("/home/gavinbarrett/gooseDB/db_file");
+	//Pager* pager = pager_open("/home/gavinbarrett/gooseDB/db_file");
+	Pager* pager = pager_open("/Users/gavinbarrett/DB/gooseDB/db_file");
+	btree_create(pager);
 
 	if (pager == NULL) return -1;
 	printf("pager->root_page%u\n",pager->root_page);

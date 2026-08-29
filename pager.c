@@ -130,6 +130,7 @@ void pager_mark_dirty(Pager* pager, int page_num){
         for(int i = 0; i < CACHE_SIZE; i++){
                 if (pager->frames[i].page_num == page_num){
                         pager->frames[i].is_dirty = true;
+			printf("marked is_dirty!\n");
                 }
         }
 
@@ -150,13 +151,22 @@ void pager_flush(Pager* pager, int page_num){
         	}
         }
 
-	pager->frames[frame_index].is_dirty=false;
+	if (frame_index == -1){
+		printf("frame_index%d\n",frame_index);
+	}
 
-	int offset = page_num * pager->page_size;
-
+	off_t offset = (off_t)(page_num * pager->page_size);
+	
+	printf("frame_index%d\n",frame_index);
 	pager->frames[frame_index].pin_count++;
 	ssize_t bytes_written = pwrite(pager->fd, pager->frames[frame_index].data, pager->page_size, offset);
+	if (bytes_written <=0 ){
+		perror("pwrite");
+	}
+
 	pager->frames[frame_index].pin_count--;
+
+	pager->frames[frame_index].is_dirty=false;
 
 	if (bytes_written <= 0)
 	{	
@@ -167,6 +177,13 @@ void pager_flush(Pager* pager, int page_num){
 
 
 void pager_close(Pager* pager){
+
+	for (int i = 0; i < CACHE_SIZE; i++){
+		if (pager->frames[i].is_dirty){
+			pager_flush(pager, pager->frames[i].page_num);
+		}
+	}
+	
 	close(pager->fd);
 	free(pager);
 
@@ -231,7 +248,7 @@ static void move_lru_head(Pager* pager, int frame_index){
 
 int pager_allocate_page(Pager* pager){
 	
-	int last_page = pager->num_pages;
+	int last_page = pager->num_pages; //-1 is so that we are zero based 
 		
 	ftruncate(pager->fd, (last_page + 1) * pager->page_size);
 
@@ -276,11 +293,14 @@ void* pager_get_page(Pager* pager, int page_num){
 		printf("data read has 0 bytes!\nn");
 
 	}
-
+	
+	printf("page_num_hash->%d\n",page_num);
 	insert_hash_entry(hash_table, frame_index, page_num);
 	move_lru_head(pager, frame_index);
+	pager->frames[frame_index].page_num = page_num;	
 	
-	return NULL;
+	return pager->frames[frame_index].data;
+	//return NULL;
 }
 
 
@@ -299,7 +319,7 @@ static int header_check(Pager* pager, int fd){
 	ssize_t bytes_read = pread(fd, header, PAGE_SIZE, 0);
 	if (memcmp(header,"GOOSESDB",8) != 0) return -1;
 
-	pager->root_page = header->root_page;	
+	pager->root_page = 1;//header->root_page;	
 	free(header);
 
 	return 0;
