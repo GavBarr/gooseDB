@@ -12,6 +12,11 @@
 #include <stdint.h>
 #include <string.h>
 
+/* internal cell = 8bytes, (key, child_page_num)
+ * leaf cell = sizeof(Row) + sizeof(uint32_t), (key, row_data)
+ */
+
+
 typedef struct __attribute__((packed)){
 	uint8_t node_type;
 	uint8_t is_root;
@@ -44,10 +49,12 @@ typedef struct __attribute__((packed)){
 } Row;
 
 void btree_create(Pager* pager);
+int find_leaf(Pager* pager, int page_num, uint32_t key);
 
 #define ROW_SIZE (sizeof(Row))
 #define CELL_SIZE (sizeof(uint32_t)+ROW_SIZE)
-#define LEAF_NODE_HEADER_SIZE (sizeof(CommonHeader))
+#define INTERNAL_CELL_SIZE (sizeof(uint32_t)+sizeof(uint32_t))
+#define LEAF_NODE_HEADER_SIZE (sizeof(BTreeNode))//(sizeof(COMMON_HEADER))
 #define LEAF_NODE_SPACE_FOR_CELLS (PAGE_SIZE - LEAF_NODE_HEADER_SIZE)
 #define LEAF_NODE_MAX_CELLS (LEAF_NODE_SPACE_FOR_CELLS / CELL_SIZE)
 

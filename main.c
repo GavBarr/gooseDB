@@ -4,9 +4,10 @@
 
 int main(void){
 	printf("test");
-	//Pager* pager = pager_open("/home/gavinbarrett/gooseDB/db_file");
-	Pager* pager = pager_open("/Users/gavinbarrett/DB/gooseDB/db_file");
-	btree_create(pager);
+	Pager* pager = pager_open("/home/gavinbarrett/gooseDB/db_file");
+	//Pager* pager = pager_open("/Users/gavinbarrett/DB/gooseDB/db_file");
+	//btree_create(pager);
+	int page_num = find_leaf(pager, pager->root_page, 12);
 
 	if (pager == NULL) return -1;
 	printf("pager->root_page%u\n",pager->root_page);
