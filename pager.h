@@ -9,7 +9,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-typedef struct{
+typedef struct __attribute__((packed)){
 	uint32_t  key; //page in our case
 	uint32_t  value; //pageframe index in our case
 	void* next;
@@ -17,19 +17,19 @@ typedef struct{
 
 } HashTableEntry;
 
-typedef struct{
+typedef struct __attribute__((packed)){
 	char      magic[8];
 	uint32_t  page_size;
 	uint32_t  root_page;
 	uint32_t  verions;
 } FileHeader;
 
-typedef struct{
+typedef struct __attribute__((packed)){
 	HashTableEntry** buckets;
 	uint32_t size;
 } HashTable;
 
-typedef struct{
+typedef struct __attribute__((packed)){
         int      page_num;
 	bool     is_dirty;
 	bool	   in_use;
@@ -39,7 +39,7 @@ typedef struct{
 	int lru_next; //frame_index - double linked list (inner)	
 } PageFrame;
 
-typedef struct{
+typedef struct __attribute__((packed)){
 	int       fd;
 	int	  page_size;
 	int       num_pages;

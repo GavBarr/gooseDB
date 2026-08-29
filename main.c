@@ -10,6 +10,6 @@ int main(void){
 	printf("pager->fd=%d\n",pager->fd);
 	printf("pager->page_size=%d\n",pager->page_size);
 	printf("pager->num_pages=%d\n",pager->num_pages);
-
+	pager_close(pager);
 	return 0;
 }

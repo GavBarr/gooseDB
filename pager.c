@@ -31,6 +31,7 @@ Pager* pager_open(char* const file_dir){
 
 	if (fstat(fd, &file_info) != 0){
 		printf("failed to get fstat()");
+		perror("fstat");
 		return NULL;
 	}
 	printf("file_info.st_size->%lu\n",file_info.st_size);
@@ -299,7 +300,7 @@ static int header_check(Pager* pager, int fd){
 	if (memcmp(header,"GOOSESDB",8) != 0) return -1;
 
 	pager->root_page = header->root_page;	
-
+	free(header);
 
 	return 0;
 }
