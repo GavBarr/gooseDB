@@ -29,6 +29,37 @@ void btree_create(Pager* pager){
 
 }
 
+int leaf_find_cell(Pager* pager, int page_num, uint32_t key){
+	void* page = pager_get_page(pager, pager_num);
+
+	BTreeNode* node = (BTreeNode*)page;
+	if (node->common_header.node_type != LEAF){
+		return -1;
+	}
+
+	//(key, row_data)
+	uint8_t* cell_array = (uint8_t*)page + sizeof(BTreeNode);
+	for (int i = 0; i < node->leaf_header.num_cells; i++){
+		uint8_t* cell = cell_array + (i * CELL_SIZE);
+		uint8_t cell_key = *(uint32_t*)cell; //key = 4bytes
+		uint8_t cell_row = *(ROW_SIZE*)(cell + sizeof(uint32_t));
+		if (key == cell_key){
+			return i; //return the correct cell array index
+		}
+	}		
+	return -1;
+}
+
+
+int leaf_insert_cell(Pager* pager, int page_num, uint32_t key, Row* row){
+	
+	void* page = pager_get_page(pager, page_num);	
+	BTreeNode* node = (BTreeNode*)page;
+	
+	
+}
+
+
 int find_leaf(Pager* pager, int page_num, uint32_t key){
 	void* page  = pager_get_page(pager, page_num);
 

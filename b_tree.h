@@ -50,6 +50,8 @@ typedef struct __attribute__((packed)){
 
 void btree_create(Pager* pager);
 int find_leaf(Pager* pager, int page_num, uint32_t key);
+int leaf_find_cell(Pager* pager, int page_num, uint32_t key);
+int leaf_insert_cell(Pager* pager, int page_num, uint32_t key, Row* row);
 
 #define ROW_SIZE (sizeof(Row))
 #define CELL_SIZE (sizeof(uint32_t)+ROW_SIZE)
